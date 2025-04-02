@@ -13,7 +13,8 @@ import (
 func main() {
 	// Parseamos los parámetros: ruta de directorio y nombre del archivo CSV de salida.
 	dirPath := flag.String("path", "./files_project", "Ruta del directorio a analizar")
-	outputCSV := flag.String("out", "output.csv", "Nombre del archivo CSV de salida")
+	outputCSV := flag.String("out_csv", "", "Nombre del archivo CSV de salida")
+	outputSQLite := flag.String("out_sqlite", "", "Nombre del archivo de la db SQLIte")
 	flag.Parse()
 	var allControllerRows []parser.RouteInfo
 
@@ -39,12 +40,26 @@ func main() {
 		log.Fatalf("Error al recorrer el directorio: %v", err)
 	}
 
-	if outputCSV != nil {
+	if *outputCSV != "" {
 		err = storage.WriteCSV(*outputCSV, allControllerRows)
 		if err != nil {
 			log.Fatalf("Error al escribir CSV: %v", err)
 		}
 
 		fmt.Printf("Análisis completado. Datos exportados a %s\n", *outputCSV)
+	}
+
+	if *outputSQLite != "" {
+		st, err := storage.NewSQLiteControllerStorage(*outputSQLite)
+		if err != nil {
+			log.Fatalf("Error al escribir DB SQLite: %v", err)
+		}
+
+		errSave := st.SaveControllerRoutes(allControllerRows)
+		if errSave != nil {
+			log.Fatalf("Error al guardar en DB SQLite: %v", errSave)
+		}
+
+		fmt.Printf("Análisis completado. Datos exportados a %s\n", *outputSQLite)
 	}
 }
