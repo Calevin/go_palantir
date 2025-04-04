@@ -15,6 +15,7 @@ func main() {
 	dirPath := flag.String("path", "./files_project", "Ruta del directorio a analizar")
 	outputCSV := flag.String("out_csv", "", "Nombre del archivo CSV de salida")
 	outputSQLite := flag.String("out_sqlite", "", "Nombre del archivo de la db SQLIte")
+	typeWebOut := flag.String("out_web", "", "Nombre del tipo de web a generar")
 	flag.Parse()
 	var allControllerRows []parser.RouteInfo
 
@@ -61,5 +62,9 @@ func main() {
 		}
 
 		fmt.Printf("Análisis completado. Datos exportados a %s\n", *outputSQLite)
+	}
+
+	if *typeWebOut != "" {
+		storage.RunWeb()
 	}
 }
