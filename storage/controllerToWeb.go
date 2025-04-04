@@ -16,8 +16,34 @@ var tmpl = template.Must(template.New("table").Parse(`
 <head>
   <meta charset="UTF-8">
   <title>Rutas de Controllers</title>
-  <!-- Se incluye HTMX -->
+  <!-- Incluir HTMX -->
   <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+  <style>
+    /* Estilos básicos para el modal */
+    #modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+    #modal-content {
+      background: white;
+      margin: 50px auto;
+      padding: 20px;
+      width: 80%;
+      max-width: 800px;
+      border-radius: 5px;
+    }
+    #modal-close {
+      float: right;
+      cursor: pointer;
+      font-size: 20px;
+    }
+  </style>
 </head>
 <body>
   <h1>Rutas de Controllers</h1>
@@ -35,11 +61,12 @@ var tmpl = template.Must(template.New("table").Parse(`
       <td>{{ .Line }}</td>
       <td>{{ .URL }}</td>
       <td>
-        <!-- Se genera un link que al hacer clic realiza una petición GET a /twig -->
+        <!-- El enlace abre el modal y carga el contenido en el div #modal-body -->
         <a href="#"
            hx-get="/twig?name={{ .NameURL }}"
-           hx-target="#twig-table"
-           hx-swap="outerHTML">
+           hx-target="#modal-body"
+           hx-swap="innerHTML"
+           onclick="document.getElementById('modal').style.display='block'">
            {{ .NameURL }}
         </a>
       </td>
@@ -47,9 +74,15 @@ var tmpl = template.Must(template.New("table").Parse(`
     </tr>
     {{ end }}
   </table>
-  <!-- Contenedor donde se cargará la tabla de Twig -->
-  <div id="twig-table">
-    <!-- Aquí se mostrarán los resultados de Twig -->
+  
+  <!-- Modal oculto -->
+  <div id="modal">
+    <div id="modal-content">
+      <span id="modal-close" onclick="document.getElementById('modal').style.display='none'">&times;</span>
+      <div id="modal-body">
+        <!-- Aquí se cargará la tabla de Twig -->
+      </div>
+    </div>
   </div>
 </body>
 </html>
