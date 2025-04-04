@@ -7,9 +7,9 @@ import (
 	"strconv"
 )
 
-// WriteControllerCSV escribe la información extraída en un archivo CSV.
-func WriteControllerCSV(filename string, routes []RouteInfo) error {
-	f, err := os.Create("controllers_" + filename)
+// WriteTwigCSV escribe la información extraída en un archivo CSV.
+func WriteTwigCSV(filename string, routes []TwigPathInfo) error {
+	f, err := os.Create("twigs_" + filename)
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func WriteControllerCSV(filename string, routes []RouteInfo) error {
 	defer writer.Flush()
 
 	// Escribir la cabecera del CSV.
-	header := []string{"file", "n_linea", "url", "name_url", "method"}
+	header := []string{"file", "n_linea", "path"}
 	if err := writer.Write(header); err != nil {
 		return err
 	}
@@ -29,9 +29,7 @@ func WriteControllerCSV(filename string, routes []RouteInfo) error {
 		record := []string{
 			r.File,
 			strconv.Itoa(r.Line),
-			r.URL,
-			r.NameURL,
-			r.Method,
+			r.PathParam,
 		}
 		if err := writer.Write(record); err != nil {
 			return err
