@@ -27,7 +27,7 @@ type TwigParser struct {
 // - ([^'"]+) captura el contenido hasta encontrar la comilla de cierre, garantizando que se use la misma.
 func NewTwigParser() *TwigParser {
 	return &TwigParser{
-		pathRe: regexp.MustCompile(`path\(\s*(?:'([^']+)'|"([^"]+)")\s*\)`),
+		pathRe: regexp.MustCompile(`path\(\s*(?:'([^']+)'|"([^"]+)")(?:\s*,\s*[^)]*)?\s*\)`),
 	}
 }
 
