@@ -1,94 +1,78 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
-	"github.com/Calevin/go_palantir/parser"
-	"github.com/Calevin/go_palantir/storage"
+	_ "fmt"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/Calevin/go_palantir/ent" // Ajusta según tu módulo
+	"github.com/Calevin/go_palantir/parser"
+	_ "github.com/mattn/go-sqlite3" // Importa el driver SQLite
 )
 
 func main() {
-	// Parseamos los parámetros: ruta de directorio y nombre del archivo CSV de salida.
-	dirPath := flag.String("path", "./files_project", "Ruta del directorio a analizar")
-	outputCSV := flag.String("out_csv", "", "Nombre del archivo CSV de salida")
+	// Parseamos los parámetros: ruta de directorio, db sqlite
+	dirPath := flag.String("path", "", "Ruta del directorio a analizar")
 	outputSQLite := flag.String("out_sqlite", "", "Nombre del archivo de la db SQLIte")
-	typeWebOut := flag.String("out_web", "", "Nombre del tipo de web a generar")
 	flag.Parse()
-	var allControllerRows []parser.RouteInfo
-	var allTwigRows []parser.TwigPathInfo
+	// Abrimos la conexión a la base de datos usando Ent.
+	ctx := context.Background()
+	client, errOpenDb := ent.Open("sqlite3", "file:"+*outputSQLite+"?cache=shared&_fk=1")
+	if errOpenDb != nil {
+		log.Fatalf("Error abriendo la conexión a SQLite: %v", errOpenDb)
+	}
+	defer client.Close()
 
-	cp := parser.NewControllerParser()
-	tp := parser.NewTwigParser()
+	// Ejecutamos la migración para crear las tablas según el esquema.
+	if errCreateSchema := client.Schema.Create(ctx); errCreateSchema != nil {
+		log.Fatalf("Error creando el esquema: %v", errCreateSchema)
+	}
 
 	// Recorrer el directorio de forma recursiva.
 	err := filepath.Walk(*dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			log.Fatal(err)
 			return err
 		}
-		// Procesamos solo archivos que no sean directorios, terminen en .php
+
 		if !info.IsDir() && filepath.Ext(info.Name()) == ".php" {
-			controllerRows, err := cp.ParseFile(path)
-			if err != nil {
-				log.Printf("Error procesando archivo %s: %v", path, err)
+			tokens, errParser := parser.TokenizeFile(path)
+
+			if errParser != nil {
+				log.Printf("Error al tokenizar el archivo %s: %v", path, errParser)
+				// Se continúa con otros archivos.
 				return nil
 			}
-			allControllerRows = append(allControllerRows, controllerRows...)
-		} else if !info.IsDir() && filepath.Ext(info.Name()) == ".twig" {
-			twigRows, err := tp.ParseFile(path)
-			if err != nil {
-				log.Printf("Error procesando archivo %s: %v", path, err)
-				return nil
+
+			// Preparamos un slice de creadores para insertar los tokens en bloque.
+			var bulkCreates []*ent.TokenCreate
+			for _, t := range tokens {
+				// Cada "t" es una instancia de ent.Token (ya que modificamos el tokenizador para usar la entidad).
+				tc := client.Token.Create().
+					SetFile(t.File).
+					SetLine(t.Line).
+					SetOrder(t.Order).
+					SetToken(t.Token)
+				bulkCreates = append(bulkCreates, tc)
 			}
-			allTwigRows = append(allTwigRows, twigRows...)
+
+			// Si hay tokens para insertar, se realiza la inserción bulk.
+			if len(bulkCreates) > 0 {
+				_, err := client.Token.CreateBulk(bulkCreates...).Save(ctx)
+				if err != nil {
+					log.Printf("Error insertando tokens para el archivo %s: %v", path, err)
+				} else {
+					log.Printf("Se insertaron %d tokens del archivo %s", len(bulkCreates), path)
+				}
+			}
 		}
 		return nil
 	})
+
 	if err != nil {
 		log.Fatalf("Error al recorrer el directorio: %v", err)
-	}
-
-	if *outputCSV != "" {
-		err = storage.WriteControllerCSV(*outputCSV, allControllerRows)
-		if err != nil {
-			log.Fatalf("Error al escribir Controller CSV: %v", err)
-		}
-
-		err = storage.WriteTwigCSV(*outputCSV, allTwigRows)
-		if err != nil {
-			log.Fatalf("Error al escribir Twig CSV: %v", err)
-		}
-
-		fmt.Printf("Análisis completado. Datos exportados a %s\n", *outputCSV)
-	}
-
-	if *outputSQLite != "" {
-		st, err := storage.NewSQLiteControllerStorage(*outputSQLite)
-		if err != nil {
-			log.Fatalf("Error al escribir Controllers DB SQLite: %v", err)
-		}
-
-		errSave := st.SaveControllerRoutes(allControllerRows)
-		if errSave != nil {
-			log.Fatalf("Error al guardar Controllers en DB SQLite: %v", errSave)
-		}
-
-		twigStorage, err := storage.NewSQLiteTwigStorage(*outputSQLite)
-		if err != nil {
-			log.Fatalf("Error al escribir Twigs DB SQLite: %v", err)
-		}
-
-		errSaveTwigs := twigStorage.SaveTwigRoutes(allTwigRows)
-		if errSaveTwigs != nil {
-			log.Fatalf("Error al guardar Twigs en DB SQLite: %v", errSaveTwigs)
-		}
-
-		fmt.Printf("Análisis completado. Datos exportados a %s\n", *outputSQLite)
-	}
-
-	if *typeWebOut != "" {
-		storage.RunWeb()
 	}
 }
