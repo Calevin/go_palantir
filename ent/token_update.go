@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/Calevin/go_palantir/ent/file"
 	"github.com/Calevin/go_palantir/ent/predicate"
 	"github.com/Calevin/go_palantir/ent/token"
 )
@@ -24,20 +25,6 @@ type TokenUpdate struct {
 // Where appends a list predicates to the TokenUpdate builder.
 func (tu *TokenUpdate) Where(ps ...predicate.Token) *TokenUpdate {
 	tu.mutation.Where(ps...)
-	return tu
-}
-
-// SetFile sets the "file" field.
-func (tu *TokenUpdate) SetFile(s string) *TokenUpdate {
-	tu.mutation.SetFile(s)
-	return tu
-}
-
-// SetNillableFile sets the "file" field if the given value is not nil.
-func (tu *TokenUpdate) SetNillableFile(s *string) *TokenUpdate {
-	if s != nil {
-		tu.SetFile(*s)
-	}
 	return tu
 }
 
@@ -97,9 +84,34 @@ func (tu *TokenUpdate) SetNillableToken(s *string) *TokenUpdate {
 	return tu
 }
 
+// SetFileID sets the "file" edge to the File entity by ID.
+func (tu *TokenUpdate) SetFileID(id int) *TokenUpdate {
+	tu.mutation.SetFileID(id)
+	return tu
+}
+
+// SetNillableFileID sets the "file" edge to the File entity by ID if the given value is not nil.
+func (tu *TokenUpdate) SetNillableFileID(id *int) *TokenUpdate {
+	if id != nil {
+		tu = tu.SetFileID(*id)
+	}
+	return tu
+}
+
+// SetFile sets the "file" edge to the File entity.
+func (tu *TokenUpdate) SetFile(f *File) *TokenUpdate {
+	return tu.SetFileID(f.ID)
+}
+
 // Mutation returns the TokenMutation object of the builder.
 func (tu *TokenUpdate) Mutation() *TokenMutation {
 	return tu.mutation
+}
+
+// ClearFile clears the "file" edge to the File entity.
+func (tu *TokenUpdate) ClearFile() *TokenUpdate {
+	tu.mutation.ClearFile()
+	return tu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -138,9 +150,6 @@ func (tu *TokenUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			}
 		}
 	}
-	if value, ok := tu.mutation.File(); ok {
-		_spec.SetField(token.FieldFile, field.TypeString, value)
-	}
 	if value, ok := tu.mutation.Line(); ok {
 		_spec.SetField(token.FieldLine, field.TypeInt, value)
 	}
@@ -155,6 +164,35 @@ func (tu *TokenUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.Token(); ok {
 		_spec.SetField(token.FieldToken, field.TypeString, value)
+	}
+	if tu.mutation.FileCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   token.FileTable,
+			Columns: []string{token.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.FileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   token.FileTable,
+			Columns: []string{token.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -174,20 +212,6 @@ type TokenUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *TokenMutation
-}
-
-// SetFile sets the "file" field.
-func (tuo *TokenUpdateOne) SetFile(s string) *TokenUpdateOne {
-	tuo.mutation.SetFile(s)
-	return tuo
-}
-
-// SetNillableFile sets the "file" field if the given value is not nil.
-func (tuo *TokenUpdateOne) SetNillableFile(s *string) *TokenUpdateOne {
-	if s != nil {
-		tuo.SetFile(*s)
-	}
-	return tuo
 }
 
 // SetLine sets the "line" field.
@@ -246,9 +270,34 @@ func (tuo *TokenUpdateOne) SetNillableToken(s *string) *TokenUpdateOne {
 	return tuo
 }
 
+// SetFileID sets the "file" edge to the File entity by ID.
+func (tuo *TokenUpdateOne) SetFileID(id int) *TokenUpdateOne {
+	tuo.mutation.SetFileID(id)
+	return tuo
+}
+
+// SetNillableFileID sets the "file" edge to the File entity by ID if the given value is not nil.
+func (tuo *TokenUpdateOne) SetNillableFileID(id *int) *TokenUpdateOne {
+	if id != nil {
+		tuo = tuo.SetFileID(*id)
+	}
+	return tuo
+}
+
+// SetFile sets the "file" edge to the File entity.
+func (tuo *TokenUpdateOne) SetFile(f *File) *TokenUpdateOne {
+	return tuo.SetFileID(f.ID)
+}
+
 // Mutation returns the TokenMutation object of the builder.
 func (tuo *TokenUpdateOne) Mutation() *TokenMutation {
 	return tuo.mutation
+}
+
+// ClearFile clears the "file" edge to the File entity.
+func (tuo *TokenUpdateOne) ClearFile() *TokenUpdateOne {
+	tuo.mutation.ClearFile()
+	return tuo
 }
 
 // Where appends a list predicates to the TokenUpdate builder.
@@ -317,9 +366,6 @@ func (tuo *TokenUpdateOne) sqlSave(ctx context.Context) (_node *Token, err error
 			}
 		}
 	}
-	if value, ok := tuo.mutation.File(); ok {
-		_spec.SetField(token.FieldFile, field.TypeString, value)
-	}
 	if value, ok := tuo.mutation.Line(); ok {
 		_spec.SetField(token.FieldLine, field.TypeInt, value)
 	}
@@ -334,6 +380,35 @@ func (tuo *TokenUpdateOne) sqlSave(ctx context.Context) (_node *Token, err error
 	}
 	if value, ok := tuo.mutation.Token(); ok {
 		_spec.SetField(token.FieldToken, field.TypeString, value)
+	}
+	if tuo.mutation.FileCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   token.FileTable,
+			Columns: []string{token.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.FileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   token.FileTable,
+			Columns: []string{token.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &Token{config: tuo.config}
 	_spec.Assign = _node.assignValues

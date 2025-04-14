@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/Calevin/go_palantir/ent/file"
 	"github.com/Calevin/go_palantir/ent/predicate"
 	"github.com/Calevin/go_palantir/ent/token"
 )
@@ -22,6 +23,8 @@ type TokenQuery struct {
 	order      []token.OrderOption
 	inters     []Interceptor
 	predicates []predicate.Token
+	withFile   *FileQuery
+	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +59,28 @@ func (tq *TokenQuery) Unique(unique bool) *TokenQuery {
 func (tq *TokenQuery) Order(o ...token.OrderOption) *TokenQuery {
 	tq.order = append(tq.order, o...)
 	return tq
+}
+
+// QueryFile chains the current query on the "file" edge.
+func (tq *TokenQuery) QueryFile() *FileQuery {
+	query := (&FileClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(token.Table, token.FieldID, selector),
+			sqlgraph.To(file.Table, file.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, token.FileTable, token.FileColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first Token entity from the query.
@@ -250,10 +275,22 @@ func (tq *TokenQuery) Clone() *TokenQuery {
 		order:      append([]token.OrderOption{}, tq.order...),
 		inters:     append([]Interceptor{}, tq.inters...),
 		predicates: append([]predicate.Token{}, tq.predicates...),
+		withFile:   tq.withFile.Clone(),
 		// clone intermediate query.
 		sql:  tq.sql.Clone(),
 		path: tq.path,
 	}
+}
+
+// WithFile tells the query-builder to eager-load the nodes that are connected to
+// the "file" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TokenQuery) WithFile(opts ...func(*FileQuery)) *TokenQuery {
+	query := (&FileClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withFile = query
+	return tq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -262,12 +299,12 @@ func (tq *TokenQuery) Clone() *TokenQuery {
 // Example:
 //
 //	var v []struct {
-//		File string `json:"file,omitempty"`
+//		Line int `json:"line,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.Token.Query().
-//		GroupBy(token.FieldFile).
+//		GroupBy(token.FieldLine).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (tq *TokenQuery) GroupBy(field string, fields ...string) *TokenGroupBy {
@@ -285,11 +322,11 @@ func (tq *TokenQuery) GroupBy(field string, fields ...string) *TokenGroupBy {
 // Example:
 //
 //	var v []struct {
-//		File string `json:"file,omitempty"`
+//		Line int `json:"line,omitempty"`
 //	}
 //
 //	client.Token.Query().
-//		Select(token.FieldFile).
+//		Select(token.FieldLine).
 //		Scan(ctx, &v)
 func (tq *TokenQuery) Select(fields ...string) *TokenSelect {
 	tq.ctx.Fields = append(tq.ctx.Fields, fields...)
@@ -332,15 +369,26 @@ func (tq *TokenQuery) prepareQuery(ctx context.Context) error {
 
 func (tq *TokenQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Token, error) {
 	var (
-		nodes = []*Token{}
-		_spec = tq.querySpec()
+		nodes       = []*Token{}
+		withFKs     = tq.withFKs
+		_spec       = tq.querySpec()
+		loadedTypes = [1]bool{
+			tq.withFile != nil,
+		}
 	)
+	if tq.withFile != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, token.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Token).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &Token{config: tq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +400,46 @@ func (tq *TokenQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Token,
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := tq.withFile; query != nil {
+		if err := tq.loadFile(ctx, query, nodes, nil,
+			func(n *Token, e *File) { n.Edges.File = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (tq *TokenQuery) loadFile(ctx context.Context, query *FileQuery, nodes []*Token, init func(*Token), assign func(*Token, *File)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Token)
+	for i := range nodes {
+		if nodes[i].file_tokens == nil {
+			continue
+		}
+		fk := *nodes[i].file_tokens
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(file.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "file_tokens" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (tq *TokenQuery) sqlCount(ctx context.Context) (int, error) {

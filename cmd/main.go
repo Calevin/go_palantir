@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	_ "fmt"
+	"github.com/Calevin/go_palantir/ent/file"
 	"log"
 	"os"
 	"path/filepath"
@@ -47,15 +48,31 @@ func main() {
 				return nil
 			}
 
+			// Extraemos el nombre del archivo sin ruta.
+			fileName := filepath.Base(path)
+			// Buscamos si ya existe un File con ese nombre, si no, lo creamos.
+			f, err := client.File.Query().Where(file.NameEQ(fileName)).Only(ctx)
+			if err != nil {
+				// Si no se encuentra, se crea uno.
+				f, err = client.File.
+					Create().
+					SetName(fileName).
+					Save(ctx)
+				if err != nil {
+					log.Printf("Error creando File para %s: %v", fileName, err)
+					return nil
+				}
+			}
+
 			// Preparamos un slice de creadores para insertar los tokens en bloque.
 			var bulkCreates []*ent.TokenCreate
 			for _, t := range tokens {
-				// Cada "t" es una instancia de ent.Token (ya que modificamos el tokenizador para usar la entidad).
+				// Cada "t" es una instancia de ent.Token
 				tc := client.Token.Create().
-					SetFile(t.File).
 					SetLine(t.Line).
 					SetOrder(t.Order).
-					SetToken(t.Token)
+					SetToken(t.Token).
+					SetFile(f) // Aquí se establece la FK hacia la entidad File.
 				bulkCreates = append(bulkCreates, tc)
 			}
 

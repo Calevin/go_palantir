@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/Calevin/go_palantir/ent/file"
 	"github.com/Calevin/go_palantir/ent/token"
 )
 
@@ -17,12 +18,6 @@ type TokenCreate struct {
 	config
 	mutation *TokenMutation
 	hooks    []Hook
-}
-
-// SetFile sets the "file" field.
-func (tc *TokenCreate) SetFile(s string) *TokenCreate {
-	tc.mutation.SetFile(s)
-	return tc
 }
 
 // SetLine sets the "line" field.
@@ -41,6 +36,25 @@ func (tc *TokenCreate) SetOrder(i int) *TokenCreate {
 func (tc *TokenCreate) SetToken(s string) *TokenCreate {
 	tc.mutation.SetToken(s)
 	return tc
+}
+
+// SetFileID sets the "file" edge to the File entity by ID.
+func (tc *TokenCreate) SetFileID(id int) *TokenCreate {
+	tc.mutation.SetFileID(id)
+	return tc
+}
+
+// SetNillableFileID sets the "file" edge to the File entity by ID if the given value is not nil.
+func (tc *TokenCreate) SetNillableFileID(id *int) *TokenCreate {
+	if id != nil {
+		tc = tc.SetFileID(*id)
+	}
+	return tc
+}
+
+// SetFile sets the "file" edge to the File entity.
+func (tc *TokenCreate) SetFile(f *File) *TokenCreate {
+	return tc.SetFileID(f.ID)
 }
 
 // Mutation returns the TokenMutation object of the builder.
@@ -77,9 +91,6 @@ func (tc *TokenCreate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (tc *TokenCreate) check() error {
-	if _, ok := tc.mutation.File(); !ok {
-		return &ValidationError{Name: "file", err: errors.New(`ent: missing required field "Token.file"`)}
-	}
 	if _, ok := tc.mutation.Line(); !ok {
 		return &ValidationError{Name: "line", err: errors.New(`ent: missing required field "Token.line"`)}
 	}
@@ -115,10 +126,6 @@ func (tc *TokenCreate) createSpec() (*Token, *sqlgraph.CreateSpec) {
 		_node = &Token{config: tc.config}
 		_spec = sqlgraph.NewCreateSpec(token.Table, sqlgraph.NewFieldSpec(token.FieldID, field.TypeInt))
 	)
-	if value, ok := tc.mutation.File(); ok {
-		_spec.SetField(token.FieldFile, field.TypeString, value)
-		_node.File = value
-	}
 	if value, ok := tc.mutation.Line(); ok {
 		_spec.SetField(token.FieldLine, field.TypeInt, value)
 		_node.Line = value
@@ -130,6 +137,23 @@ func (tc *TokenCreate) createSpec() (*Token, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.Token(); ok {
 		_spec.SetField(token.FieldToken, field.TypeString, value)
 		_node.Token = value
+	}
+	if nodes := tc.mutation.FileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   token.FileTable,
+			Columns: []string{token.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.file_tokens = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

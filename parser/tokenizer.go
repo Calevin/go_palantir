@@ -2,10 +2,8 @@ package parser
 
 import (
 	"bufio"
-	"os"
-	"path/filepath"
-
 	"github.com/Calevin/go_palantir/ent"
+	"os"
 )
 
 // tokenizeLine recibe una línea y la parte en tokens.
@@ -71,7 +69,6 @@ func TokenizeFile(filePath string) ([]*ent.Token, error) {
 		// Se guarda cada token, asignándole su orden en la línea (comenzando en 1).
 		for i, t := range lineTokens {
 			ft := &ent.Token{
-				File:  filepath.Base(filePath),
 				Line:  lineNumber,
 				Order: i + 1,
 				Token: t,

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 )
 
@@ -13,8 +14,6 @@ type Token struct {
 // Fields of the Token.
 func (Token) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("file").
-			Comment("Nombre del archivo de donde se extrajo el token"),
 		field.Int("line").
 			Comment("Número de línea donde se encontró el token"),
 		field.Int("order").
@@ -26,5 +25,10 @@ func (Token) Fields() []ent.Field {
 
 // Edges of the Token.
 func (Token) Edges() []ent.Edge {
-	return nil
+	return []ent.Edge{
+		// Define la relación inversa: Cada Token pertenece a un File.
+		edge.From("file", File.Type).
+			Ref("tokens").
+			Unique(),
+	}
 }

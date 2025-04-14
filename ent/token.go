@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/Calevin/go_palantir/ent/file"
 	"github.com/Calevin/go_palantir/ent/token"
 )
 
@@ -16,15 +17,37 @@ type Token struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
-	// Nombre del archivo de donde se extrajo el token
-	File string `json:"file,omitempty"`
 	// Número de línea donde se encontró el token
 	Line int `json:"line,omitempty"`
 	// Orden del token en la línea
 	Order int `json:"order,omitempty"`
 	// Contenido del token
-	Token        string `json:"token,omitempty"`
+	Token string `json:"token,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the TokenQuery when eager-loading is set.
+	Edges        TokenEdges `json:"edges"`
+	file_tokens  *int
 	selectValues sql.SelectValues
+}
+
+// TokenEdges holds the relations/edges for other nodes in the graph.
+type TokenEdges struct {
+	// File holds the value of the file edge.
+	File *File `json:"file,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// FileOrErr returns the File value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TokenEdges) FileOrErr() (*File, error) {
+	if e.File != nil {
+		return e.File, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: file.Label}
+	}
+	return nil, &NotLoadedError{edge: "file"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -34,8 +57,10 @@ func (*Token) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case token.FieldID, token.FieldLine, token.FieldOrder:
 			values[i] = new(sql.NullInt64)
-		case token.FieldFile, token.FieldToken:
+		case token.FieldToken:
 			values[i] = new(sql.NullString)
+		case token.ForeignKeys[0]: // file_tokens
+			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -57,12 +82,6 @@ func (t *Token) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			t.ID = int(value.Int64)
-		case token.FieldFile:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field file", values[i])
-			} else if value.Valid {
-				t.File = value.String
-			}
 		case token.FieldLine:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field line", values[i])
@@ -81,6 +100,13 @@ func (t *Token) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				t.Token = value.String
 			}
+		case token.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field file_tokens", value)
+			} else if value.Valid {
+				t.file_tokens = new(int)
+				*t.file_tokens = int(value.Int64)
+			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
 		}
@@ -92,6 +118,11 @@ func (t *Token) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (t *Token) Value(name string) (ent.Value, error) {
 	return t.selectValues.Get(name)
+}
+
+// QueryFile queries the "file" edge of the Token entity.
+func (t *Token) QueryFile() *FileQuery {
+	return NewTokenClient(t.config).QueryFile(t)
 }
 
 // Update returns a builder for updating this Token.
@@ -117,9 +148,6 @@ func (t *Token) String() string {
 	var builder strings.Builder
 	builder.WriteString("Token(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", t.ID))
-	builder.WriteString("file=")
-	builder.WriteString(t.File)
-	builder.WriteString(", ")
 	builder.WriteString("line=")
 	builder.WriteString(fmt.Sprintf("%v", t.Line))
 	builder.WriteString(", ")

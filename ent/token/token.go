@@ -4,6 +4,7 @@ package token
 
 import (
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -11,31 +12,48 @@ const (
 	Label = "token"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
-	// FieldFile holds the string denoting the file field in the database.
-	FieldFile = "file"
 	// FieldLine holds the string denoting the line field in the database.
 	FieldLine = "line"
 	// FieldOrder holds the string denoting the order field in the database.
 	FieldOrder = "order"
 	// FieldToken holds the string denoting the token field in the database.
 	FieldToken = "token"
+	// EdgeFile holds the string denoting the file edge name in mutations.
+	EdgeFile = "file"
 	// Table holds the table name of the token in the database.
 	Table = "tokens"
+	// FileTable is the table that holds the file relation/edge.
+	FileTable = "tokens"
+	// FileInverseTable is the table name for the File entity.
+	// It exists in this package in order to avoid circular dependency with the "file" package.
+	FileInverseTable = "files"
+	// FileColumn is the table column denoting the file relation/edge.
+	FileColumn = "file_tokens"
 )
 
 // Columns holds all SQL columns for token fields.
 var Columns = []string{
 	FieldID,
-	FieldFile,
 	FieldLine,
 	FieldOrder,
 	FieldToken,
+}
+
+// ForeignKeys holds the SQL foreign-keys that are owned by the "tokens"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"file_tokens",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -48,11 +66,6 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
-}
-
-// ByFile orders the results by the file field.
-func ByFile(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldFile, opts...).ToFunc()
 }
 
 // ByLine orders the results by the line field.
@@ -68,4 +81,18 @@ func ByOrder(opts ...sql.OrderTermOption) OrderOption {
 // ByToken orders the results by the token field.
 func ByToken(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldToken, opts...).ToFunc()
+}
+
+// ByFileField orders the results by file field.
+func ByFileField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newFileStep(), sql.OrderByField(field, opts...))
+	}
+}
+func newFileStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(FileInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, FileTable, FileColumn),
+	)
 }

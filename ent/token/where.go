@@ -4,6 +4,7 @@ package token
 
 import (
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/Calevin/go_palantir/ent/predicate"
 )
 
@@ -52,11 +53,6 @@ func IDLTE(id int) predicate.Token {
 	return predicate.Token(sql.FieldLTE(FieldID, id))
 }
 
-// File applies equality check predicate on the "file" field. It's identical to FileEQ.
-func File(v string) predicate.Token {
-	return predicate.Token(sql.FieldEQ(FieldFile, v))
-}
-
 // Line applies equality check predicate on the "line" field. It's identical to LineEQ.
 func Line(v int) predicate.Token {
 	return predicate.Token(sql.FieldEQ(FieldLine, v))
@@ -70,71 +66,6 @@ func Order(v int) predicate.Token {
 // Token applies equality check predicate on the "token" field. It's identical to TokenEQ.
 func Token(v string) predicate.Token {
 	return predicate.Token(sql.FieldEQ(FieldToken, v))
-}
-
-// FileEQ applies the EQ predicate on the "file" field.
-func FileEQ(v string) predicate.Token {
-	return predicate.Token(sql.FieldEQ(FieldFile, v))
-}
-
-// FileNEQ applies the NEQ predicate on the "file" field.
-func FileNEQ(v string) predicate.Token {
-	return predicate.Token(sql.FieldNEQ(FieldFile, v))
-}
-
-// FileIn applies the In predicate on the "file" field.
-func FileIn(vs ...string) predicate.Token {
-	return predicate.Token(sql.FieldIn(FieldFile, vs...))
-}
-
-// FileNotIn applies the NotIn predicate on the "file" field.
-func FileNotIn(vs ...string) predicate.Token {
-	return predicate.Token(sql.FieldNotIn(FieldFile, vs...))
-}
-
-// FileGT applies the GT predicate on the "file" field.
-func FileGT(v string) predicate.Token {
-	return predicate.Token(sql.FieldGT(FieldFile, v))
-}
-
-// FileGTE applies the GTE predicate on the "file" field.
-func FileGTE(v string) predicate.Token {
-	return predicate.Token(sql.FieldGTE(FieldFile, v))
-}
-
-// FileLT applies the LT predicate on the "file" field.
-func FileLT(v string) predicate.Token {
-	return predicate.Token(sql.FieldLT(FieldFile, v))
-}
-
-// FileLTE applies the LTE predicate on the "file" field.
-func FileLTE(v string) predicate.Token {
-	return predicate.Token(sql.FieldLTE(FieldFile, v))
-}
-
-// FileContains applies the Contains predicate on the "file" field.
-func FileContains(v string) predicate.Token {
-	return predicate.Token(sql.FieldContains(FieldFile, v))
-}
-
-// FileHasPrefix applies the HasPrefix predicate on the "file" field.
-func FileHasPrefix(v string) predicate.Token {
-	return predicate.Token(sql.FieldHasPrefix(FieldFile, v))
-}
-
-// FileHasSuffix applies the HasSuffix predicate on the "file" field.
-func FileHasSuffix(v string) predicate.Token {
-	return predicate.Token(sql.FieldHasSuffix(FieldFile, v))
-}
-
-// FileEqualFold applies the EqualFold predicate on the "file" field.
-func FileEqualFold(v string) predicate.Token {
-	return predicate.Token(sql.FieldEqualFold(FieldFile, v))
-}
-
-// FileContainsFold applies the ContainsFold predicate on the "file" field.
-func FileContainsFold(v string) predicate.Token {
-	return predicate.Token(sql.FieldContainsFold(FieldFile, v))
 }
 
 // LineEQ applies the EQ predicate on the "line" field.
@@ -280,6 +211,29 @@ func TokenEqualFold(v string) predicate.Token {
 // TokenContainsFold applies the ContainsFold predicate on the "token" field.
 func TokenContainsFold(v string) predicate.Token {
 	return predicate.Token(sql.FieldContainsFold(FieldToken, v))
+}
+
+// HasFile applies the HasEdge predicate on the "file" edge.
+func HasFile() predicate.Token {
+	return predicate.Token(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, FileTable, FileColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasFileWith applies the HasEdge predicate on the "file" edge with a given conditions (other predicates).
+func HasFileWith(preds ...predicate.File) predicate.Token {
+	return predicate.Token(func(s *sql.Selector) {
+		step := newFileStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.
